@@ -58,16 +58,14 @@ install -m 0755 "$SCRIPT_DIR/bin/claude_off.sh"      /usr/local/bin/claude_off.s
 #    Bei sudo ist das der echte Aufrufer (SUDO_USER), nicht root – sonst landet
 #    die Konfig im falschen Home und gehoert anschliessend root.
 TARGET_USER="${SUDO_USER:-$(id -un)}"
-TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
-TARGET_GROUP="$(id -gn "$TARGET_USER")"
-SETTINGS_DIR="$TARGET_HOME/.claude"
-SETTINGS="$SETTINGS_DIR/settings.json"
+TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6 || true)"
 
 # Hook-Zuordnung:
-#   UserPromptSubmit            -> rot   (Claude arbeitet)
-#   PreToolUse/AskUserQuestion  -> gelb  (echte Rueckfrage, blockiert)
-#   Notification/permission_*   -> gelb  (Berechtigung noetig, blockiert)
-#   Stop                        -> gruen (Zwischenschritt oder fertig)
+#   UserPromptSubmit                -> rot   (Claude arbeitet)
+#   PreToolUse/AskUserQuestion      -> gelb  (echte Rueckfrage, blockiert)
+#   Notification/permission_prompt  -> gelb  (Berechtigung noetig, blockiert)
+#   Stop                            -> gruen (Zwischenschritt oder fertig)
+# read -d '' liefert am EOF stets Exit != 0 -> mit || true abfangen (set -e).
 read -r -d '' HOOKS_JSON <<'JSON' || true
 {
   "UserPromptSubmit": [
@@ -85,28 +83,57 @@ read -r -d '' HOOKS_JSON <<'JSON' || true
 }
 JSON
 
-echo "    Richte Claude-Code-Hooks in $SETTINGS ein ..."
-if command -v jq >/dev/null 2>&1; then
-    mkdir -p "$SETTINGS_DIR"
-    if [ -f "$SETTINGS" ]; then
+# Merge: aus den vier verwalteten Events nur fruehere Ampel-Eintraege
+# (claude_on_*.sh) entfernen und unsere anhaengen. So bleiben fremde Hooks auf
+# denselben Events erhalten und Wiederholungslaeufe bleiben idempotent.
+HOOKS_MERGE='
+  .hooks = (.hooks // {})
+  | reduce ($h | to_entries[]) as $e (.;
+      .hooks[$e.key] = (
+        ((.hooks[$e.key] // [])
+          | map(select(
+              ([ .hooks[]?.command // empty
+                 | test("claude_on_(start|ask|stop)\\.sh$") ] | any) | not)))
+        + $e.value))'
+
+if [ -z "$TARGET_HOME" ] || [ ! -d "$TARGET_HOME" ]; then
+    echo "    Warnung: Home von '$TARGET_USER' nicht ermittelbar – Hooks uebersprungen." >&2
+elif ! command -v jq >/dev/null 2>&1; then
+    echo "    Warnung: 'jq' fehlt – Hooks bitte manuell unter \"hooks\" in" >&2
+    echo "             $TARGET_HOME/.claude/settings.json eintragen:" >&2
+    printf '%s\n' "$HOOKS_JSON" >&2
+else
+    SETTINGS_DIR="$TARGET_HOME/.claude"
+    SETTINGS="$SETTINGS_DIR/settings.json"
+    echo "    Richte Claude-Code-Hooks in $SETTINGS ein ..."
+
+    dir_created=0
+    if [ ! -d "$SETTINGS_DIR" ]; then
+        mkdir -p "$SETTINGS_DIR"
+        dir_created=1
+    fi
+
+    # Leere/whitespace-Datei wie {} behandeln – jq macht aus leerer Eingabe
+    # sonst klammheimlich eine 0-Byte-Datei (Exit 0, keine Ausgabe).
+    if [ -s "$SETTINGS" ]; then
         existing="$(cat "$SETTINGS")"
     else
         existing='{}'
     fi
-    # Bestehende Settings erhalten, nur die vier Ampel-Events (ueber)schreiben.
-    if printf '%s' "$existing" \
-        | jq --argjson h "$HOOKS_JSON" '.hooks = ((.hooks // {}) + $h)' \
-        > "$SETTINGS.tmp"; then
+    [ -n "${existing//[[:space:]]/}" ] || existing='{}'
+
+    if printf '%s' "$existing" | jq --argjson h "$HOOKS_JSON" "$HOOKS_MERGE" \
+        > "$SETTINGS.tmp" && [ -s "$SETTINGS.tmp" ]; then
         mv "$SETTINGS.tmp" "$SETTINGS"
-        chown -R "$TARGET_USER:$TARGET_GROUP" "$SETTINGS_DIR"
+        # Nur die geschriebene Datei (und ggf. das frisch angelegte Verzeichnis)
+        # dem User geben – kein rekursives chown ueber das ganze ~/.claude.
+        chown "$TARGET_USER:" "$SETTINGS"
+        if [ "$dir_created" -eq 1 ]; then chown "$TARGET_USER:" "$SETTINGS_DIR"; fi
     else
         rm -f "$SETTINGS.tmp"
+        if [ "$dir_created" -eq 1 ]; then chown "$TARGET_USER:" "$SETTINGS_DIR"; fi
         echo "    Warnung: $SETTINGS ist kein gueltiges JSON – Hooks nicht eingerichtet." >&2
     fi
-else
-    echo "    Warnung: 'jq' nicht gefunden – Hooks bitte manuell unter \"hooks\" in" >&2
-    echo "             $SETTINGS eintragen:" >&2
-    printf '%s\n' "$HOOKS_JSON" >&2
 fi
 
 echo ""
@@ -116,7 +143,7 @@ echo "  Hook-Scripts     : /usr/local/bin/claude_on_start.sh"
 echo "                     /usr/local/bin/claude_on_ask.sh"
 echo "                     /usr/local/bin/claude_on_stop.sh"
 echo "                     /usr/local/bin/claude_off.sh"
-echo "  Claude-Hooks     : $SETTINGS"
+echo "  Claude-Hooks     : ${SETTINGS:-(uebersprungen)}"
 echo ""
 echo "Smoke-Test:"
 echo "  /usr/local/bin/claude_on_start.sh   # Ampel rot"
