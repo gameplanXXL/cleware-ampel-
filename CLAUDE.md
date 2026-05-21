@@ -29,8 +29,13 @@ aufrufenden Users geschrieben):
 
 - `UserPromptSubmit` → `claude_on_start.sh` (rot)
 - `PreToolUse` mit Matcher `AskUserQuestion` → `claude_on_ask.sh` (gelb)
+- `PostToolUse` mit Matcher `AskUserQuestion` → `claude_on_start.sh` (rot)
 - `Notification` mit Matcher `permission_prompt` → `claude_on_ask.sh` (gelb)
 - `Stop` → `claude_on_stop.sh` (grün)
+
+`PostToolUse`/`AskUserQuestion` feuert, wenn die Frage **beantwortet** ist und
+Claude weiterarbeitet – so wechselt die Ampel von gelb zurück auf rot, statt bis
+zum nächsten `Stop` (grün) gelb zu bleiben.
 
 Gelb wird **bewusst** nur über das Frage-Tool `AskUserQuestion` bzw. eine
 Berechtigungsanfrage ausgelöst – nicht über den allgemeinen `Notification`-Hook,

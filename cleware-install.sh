@@ -63,6 +63,7 @@ TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6 || true)"
 # Hook-Zuordnung:
 #   UserPromptSubmit                -> rot   (Claude arbeitet)
 #   PreToolUse/AskUserQuestion      -> gelb  (echte Rueckfrage, blockiert)
+#   PostToolUse/AskUserQuestion     -> rot   (Frage beantwortet, Claude arbeitet weiter)
 #   Notification/permission_prompt  -> gelb  (Berechtigung noetig, blockiert)
 #   Stop                            -> gruen (Zwischenschritt oder fertig)
 # read -d '' liefert am EOF stets Exit != 0 -> mit || true abfangen (set -e).
@@ -73,6 +74,9 @@ read -r -d '' HOOKS_JSON <<'JSON' || true
   ],
   "PreToolUse": [
     { "matcher": "AskUserQuestion", "hooks": [ { "type": "command", "command": "/usr/local/bin/claude_on_ask.sh" } ] }
+  ],
+  "PostToolUse": [
+    { "matcher": "AskUserQuestion", "hooks": [ { "type": "command", "command": "/usr/local/bin/claude_on_start.sh" } ] }
   ],
   "Notification": [
     { "matcher": "permission_prompt", "hooks": [ { "type": "command", "command": "/usr/local/bin/claude_on_ask.sh" } ] }
