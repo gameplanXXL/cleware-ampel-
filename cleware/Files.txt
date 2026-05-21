@@ -1,0 +1,22 @@
+
+USBaccess.cpp USBaccess.h USBaccessBasic.c USBaccessBasic.h USBaccessDevTypes.h  -   Basic funtions 
+
+*Libhid -   use the LibHid, if needed
+
+USBswitchCmd   - Program to control all types of Cleware Switches, TrafficLights(Ampel), Relais
+
+USBtemp  - sample how to access Sensors
+
+USBio16  - sample how to handle USBio16 device
+
+USBcounter - Example how to access USB-Counter devices
+
+send2cc  - Programm to send data to ClewareControl via TCP/IP sockets
+
+Example  - Example 
+
+CallCleware.py  -  sample for use in Python
+
+GetCount.py - sample how to use the return value of a function, here the USBcounter
+
+USBaccess.so  -  try to use USBaccess as a library for access in Python, see CallClewareLib.py
