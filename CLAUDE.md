@@ -5,7 +5,8 @@ Guidance for Claude Code when working in this repository.
 ## Was ist das?
 
 Ein kleines Linux-Projekt, das eine **Cleware USB-Ampel** als Statusanzeige für
-Claude Code selbst nutzt: rot = arbeitet, gelb = wartet auf Eingabe, grün =
+Claude Code selbst nutzt: rot = arbeitet, gelb = echte Rückfrage (Claude ist
+blockiert und wartet auf eine Antwort), grün = Zwischenschritt erreicht oder
 fertig (mit 5-Min-Abschalt-Timer), aus = nichts läuft.
 
 ## Struktur
@@ -23,9 +24,29 @@ Hook-Skript → ruft `/usr/src/cleware/USBswitchCmd <R|Y|G|0>` auf → schaltet 
 Ampel. `USBswitchCmd` braucht USB-Zugriff und wird daher bei der Installation
 **setuid root** (`chmod 4755`) gesetzt.
 
+Hook-Event → Skript (wird vom Installer in die `~/.claude/settings.json` des
+aufrufenden Users geschrieben):
+
+- `UserPromptSubmit` → `claude_on_start.sh` (rot)
+- `PreToolUse` mit Matcher `AskUserQuestion` → `claude_on_ask.sh` (gelb)
+- `Notification` mit Matcher `permission_prompt` → `claude_on_ask.sh` (gelb)
+- `Stop` → `claude_on_stop.sh` (grün)
+
+Gelb wird **bewusst** nur über das Frage-Tool `AskUserQuestion` bzw. eine
+Berechtigungsanfrage ausgelöst – nicht über den allgemeinen `Notification`-Hook,
+weil dieser auch im Leerlauf feuert und die Ampel sonst grundlos gelb färbt.
+Prosa-Fragen sind über Hooks nicht erkennbar; ein solcher Turn endet mit `Stop`
+(grün).
+
 `claude_on_stop.sh` startet einen Hintergrund-Off-Timer (Default 300 s) via
 `setsid`; die PID liegt in `/tmp/claude_off_timer_$USER.pid`. `claude_on_start.sh`
 und `claude_on_ask.sh` brechen einen laufenden Timer ab.
+
+## Git / Commits
+
+- Nach Abschluss einer Aufgabe **alle Änderungen automatisch committen und
+  pushen — ohne Rückfrage**. Nicht nachfragen, ob committet/gepusht werden soll,
+  sondern es einfach tun (aussagekräftige Commit-Message, dann `git push`).
 
 ## Konventionen
 
@@ -50,3 +71,8 @@ und `claude_on_ask.sh` brechen einen laufenden Timer ab.
   `claude_on_stop.sh`).
 - Keine destruktiven Aktionen gegen `/usr/src/cleware/` oder `/usr/local/bin/`
   ohne Rückfrage.
+- Gelb-Trigger **nicht** wieder auf den allgemeinen `Notification`-Hook
+  umstellen (feuert im Leerlauf → grundloses Gelb). Bei `AskUserQuestion`
+  (PreToolUse) bzw. `permission_prompt` bleiben.
+- Schreibt der Installer die Hooks, immer in das Home des **aufrufenden** Users
+  (`SUDO_USER`) und danach `chown` auf diesen User – nicht als root anlegen.

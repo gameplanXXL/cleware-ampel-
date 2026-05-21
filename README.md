@@ -5,8 +5,8 @@ Steuert eine **Cleware USB-Ampel** als Statusanzeige für [Claude Code](https://
 | Ampel | Bedeutung |
 |-------|-----------|
 | 🔴 Rot | Claude arbeitet |
-| 🟡 Gelb | Claude wartet auf eine Eingabe |
-| 🟢 Grün | Claude ist fertig (danach 5-Min-Timer bis „aus“) |
+| 🟡 Gelb | Claude wartet auf deine Antwort (echte Rückfrage / Berechtigung) |
+| 🟢 Grün | Claude hat einen Zwischenschritt erreicht oder ist fertig (danach 5-Min-Timer bis „aus“) |
 | ⚫ Aus | nichts läuft / Timer abgelaufen |
 
 Umgesetzt über Claude-Code-Hooks, die kleine Shell-Skripte aufrufen, welche
@@ -20,8 +20,8 @@ wiederum das Cleware-Tool `USBswitchCmd` ansteuern.
 ```
 bin/                  Hook-Skripte für Claude Code
   claude_on_start.sh  -> Ampel rot   (Arbeit beginnt, Off-Timer wird gestoppt)
-  claude_on_ask.sh    -> Ampel gelb  (wartet auf Eingabe, Off-Timer wird gestoppt)
-  claude_on_stop.sh   -> Ampel grün  (fertig, startet 5-Min-Off-Timer)
+  claude_on_ask.sh    -> Ampel gelb  (echte Rückfrage, Off-Timer wird gestoppt)
+  claude_on_stop.sh   -> Ampel grün  (Zwischenschritt/fertig, startet 5-Min-Off-Timer)
   claude_off.sh       -> Ampel aus
 cleware/              Cleware-Hersteller-Tools (C/C++-Quellen, Makefile, Binaries)
   USBswitchCmd        Programm zum Schalten der Ampel/Switches (GPLv3)
@@ -52,7 +52,9 @@ Der Installer:
    das mitgelieferte Binary,
 2. kopiert die Cleware-Tools nach `/usr/src/cleware/` und setzt `USBswitchCmd`
    auf **setuid root** (`chmod 4755`), damit der USB-Zugriff ohne `sudo` klappt,
-3. installiert die Hook-Skripte nach `/usr/local/bin/`.
+3. installiert die Hook-Skripte nach `/usr/local/bin/`,
+4. trägt die Hooks in die `~/.claude/settings.json` des aufrufenden Users ein
+   (per `jq`-Merge; vorhandene Einstellungen bleiben erhalten).
 
 > Hinweis: Es muss **kein Tar-Archiv** mehr entpackt werden – der Installer
 > arbeitet direkt mit dem ausgecheckten Git-Repo.
@@ -68,14 +70,23 @@ Der Installer:
 
 ## Anbindung an Claude Code
 
-Die Skripte sind als Claude-Code-Hooks gedacht. Beispielhafte Zuordnung in der
-Claude-Code-Konfiguration (`~/.claude/settings.json`):
+Die Skripte sind als Claude-Code-Hooks gedacht. Der Installer trägt diese
+Zuordnung automatisch in die `~/.claude/settings.json` ein:
 
-| Hook-Ereignis        | Skript                              | Ampel |
-|----------------------|-------------------------------------|-------|
-| `SessionStart` / `UserPromptSubmit` | `/usr/local/bin/claude_on_start.sh` | rot |
-| `Notification` (wartet auf Eingabe) | `/usr/local/bin/claude_on_ask.sh`   | gelb |
-| `Stop`               | `/usr/local/bin/claude_on_stop.sh`  | grün |
+| Hook-Ereignis | Skript | Ampel |
+|---------------|--------|-------|
+| `UserPromptSubmit` | `/usr/local/bin/claude_on_start.sh` | rot |
+| `PreToolUse` (Matcher `AskUserQuestion`) | `/usr/local/bin/claude_on_ask.sh` | gelb |
+| `Notification` (Matcher `permission_prompt`) | `/usr/local/bin/claude_on_ask.sh` | gelb |
+| `Stop` | `/usr/local/bin/claude_on_stop.sh` | grün |
+
+**Gelb gezielt:** Es wird bewusst **nicht** mehr der allgemeine `Notification`-Hook
+verwendet, weil dieser auch im Leerlauf (~60 s nach Turn-Ende) feuert und die
+Ampel dann fälschlich gelb färbte. Gelb erscheint nur noch, wenn Claude
+tatsächlich blockiert ist und auf eine Antwort wartet – also beim Frage-Tool
+`AskUserQuestion` oder einer Berechtigungsanfrage. Eine frei in Prosa gestellte
+Frage lässt sich über Hooks nicht zuverlässig erkennen; ein solcher Turn endet
+mit `Stop` und zeigt daher **grün**.
 
 `claude_on_stop.sh` startet einen Hintergrund-Timer (Standard: 300 s), der die
 Ampel danach via `claude_off.sh` ausschaltet. Ein erneuter Start (`rot`/`gelb`)

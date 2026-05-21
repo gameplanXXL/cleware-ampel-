@@ -54,6 +54,61 @@ install -m 0755 "$SCRIPT_DIR/bin/claude_on_ask.sh"   /usr/local/bin/claude_on_as
 install -m 0755 "$SCRIPT_DIR/bin/claude_on_stop.sh"  /usr/local/bin/claude_on_stop.sh
 install -m 0755 "$SCRIPT_DIR/bin/claude_off.sh"      /usr/local/bin/claude_off.sh
 
+# 3. Claude-Code-Hooks in der settings.json des aufrufenden Users einrichten.
+#    Bei sudo ist das der echte Aufrufer (SUDO_USER), nicht root – sonst landet
+#    die Konfig im falschen Home und gehoert anschliessend root.
+TARGET_USER="${SUDO_USER:-$(id -un)}"
+TARGET_HOME="$(getent passwd "$TARGET_USER" | cut -d: -f6)"
+TARGET_GROUP="$(id -gn "$TARGET_USER")"
+SETTINGS_DIR="$TARGET_HOME/.claude"
+SETTINGS="$SETTINGS_DIR/settings.json"
+
+# Hook-Zuordnung:
+#   UserPromptSubmit            -> rot   (Claude arbeitet)
+#   PreToolUse/AskUserQuestion  -> gelb  (echte Rueckfrage, blockiert)
+#   Notification/permission_*   -> gelb  (Berechtigung noetig, blockiert)
+#   Stop                        -> gruen (Zwischenschritt oder fertig)
+read -r -d '' HOOKS_JSON <<'JSON' || true
+{
+  "UserPromptSubmit": [
+    { "hooks": [ { "type": "command", "command": "/usr/local/bin/claude_on_start.sh" } ] }
+  ],
+  "PreToolUse": [
+    { "matcher": "AskUserQuestion", "hooks": [ { "type": "command", "command": "/usr/local/bin/claude_on_ask.sh" } ] }
+  ],
+  "Notification": [
+    { "matcher": "permission_prompt", "hooks": [ { "type": "command", "command": "/usr/local/bin/claude_on_ask.sh" } ] }
+  ],
+  "Stop": [
+    { "hooks": [ { "type": "command", "command": "/usr/local/bin/claude_on_stop.sh" } ] }
+  ]
+}
+JSON
+
+echo "    Richte Claude-Code-Hooks in $SETTINGS ein ..."
+if command -v jq >/dev/null 2>&1; then
+    mkdir -p "$SETTINGS_DIR"
+    if [ -f "$SETTINGS" ]; then
+        existing="$(cat "$SETTINGS")"
+    else
+        existing='{}'
+    fi
+    # Bestehende Settings erhalten, nur die vier Ampel-Events (ueber)schreiben.
+    if printf '%s' "$existing" \
+        | jq --argjson h "$HOOKS_JSON" '.hooks = ((.hooks // {}) + $h)' \
+        > "$SETTINGS.tmp"; then
+        mv "$SETTINGS.tmp" "$SETTINGS"
+        chown -R "$TARGET_USER:$TARGET_GROUP" "$SETTINGS_DIR"
+    else
+        rm -f "$SETTINGS.tmp"
+        echo "    Warnung: $SETTINGS ist kein gueltiges JSON – Hooks nicht eingerichtet." >&2
+    fi
+else
+    echo "    Warnung: 'jq' nicht gefunden – Hooks bitte manuell unter \"hooks\" in" >&2
+    echo "             $SETTINGS eintragen:" >&2
+    printf '%s\n' "$HOOKS_JSON" >&2
+fi
+
 echo ""
 echo "Fertig."
 echo "  Cleware-Binaries : /usr/src/cleware/"
@@ -61,9 +116,10 @@ echo "  Hook-Scripts     : /usr/local/bin/claude_on_start.sh"
 echo "                     /usr/local/bin/claude_on_ask.sh"
 echo "                     /usr/local/bin/claude_on_stop.sh"
 echo "                     /usr/local/bin/claude_off.sh"
+echo "  Claude-Hooks     : $SETTINGS"
 echo ""
 echo "Smoke-Test:"
 echo "  /usr/local/bin/claude_on_start.sh   # Ampel rot"
-echo "  /usr/local/bin/claude_on_ask.sh     # Ampel gelb (wartet auf Eingabe)"
+echo "  /usr/local/bin/claude_on_ask.sh     # Ampel gelb (echte Rueckfrage)"
 echo "  /usr/local/bin/claude_on_stop.sh    # Ampel grün, 5-Min-Timer läuft"
 echo "  /usr/local/bin/claude_off.sh        # Ampel aus"
