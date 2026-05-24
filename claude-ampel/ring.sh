@@ -1,18 +1,20 @@
 #!/bin/bash
-# Spielt einen Ton mehrfach im festen Abstand – als akustische Erinnerung, dass
-# Claude auf eine Antwort wartet (Rückfrage) oder fertig ist (Stop).
+# Spielt einen Ton einmalig mehrfach hintereinander ab – als kurze akustische
+# Erinnerung, dass Claude auf eine Antwort wartet (Rückfrage) oder fertig ist
+# (Stop). Bewusst kein dauerhaftes/wiederholtes Klingeln: nur 3× direkt
+# hintereinander, dann Ruhe.
 #
 # Läuft als Hintergrundjob, gestartet über lib.sh ring_start. Einstellbar per
 # Umgebungsvariablen:
-#   CLAUDE_RING_COUNT     Anzahl der Töne            (Default 5)
-#   CLAUDE_RING_INTERVAL  Sekunden zwischen den Tönen (Default 20 = 3× pro Minute)
-#   CLAUDE_RING_SOUND     Pfad zu einer Sounddatei   (sonst System-Sound)
+#   CLAUDE_RING_COUNT     Anzahl der Töne             (Default 3)
+#   CLAUDE_RING_INTERVAL  Sekunden zwischen den Tönen (Default 0 = direkt hintereinander)
+#   CLAUDE_RING_SOUND     Pfad zu einer Sounddatei    (sonst System-Sound)
 #
 # Findet sich kein Player/Sound, wird ersatzweise die Terminal-Glocke (BEL)
 # ausgegeben.
 
-COUNT="${CLAUDE_RING_COUNT:-5}"
-INTERVAL="${CLAUDE_RING_INTERVAL:-20}"   # 20 s ⇒ 3× pro Minute
+COUNT="${CLAUDE_RING_COUNT:-3}"
+INTERVAL="${CLAUDE_RING_INTERVAL:-0}"   # 0 s ⇒ direkt hintereinander
 
 # Erste lesbare Sounddatei ermitteln (oder die explizit vorgegebene).
 find_sound() {
