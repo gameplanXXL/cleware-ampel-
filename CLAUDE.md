@@ -113,7 +113,10 @@ schicken (siehe Off-Timer/Ring via `job_spawn`), damit der Hook nicht blockiert.
   `lib.sh` `off_timer_arm`); Ring-Defaults entsprechend in `ring.sh`.
 - Keine destruktiven Aktionen gegen `/usr/src/cleware/`, `/usr/local/bin/` oder
   `/etc/claude-ampel/` ohne Rückfrage. Der Installer überschreibt mit `cp` nur die
-  mitgelieferten Dateien und löscht **keine** fremden Drop-ins.
+  mitgelieferten Dateien und löscht **keine** fremden Drop-ins. Einzige Ausnahme:
+  er entfernt gezielt die **eigenen** verwaisten Alt-Skripte
+  (`claude_on_*.sh`, `claude_off.sh`) aus `/usr/local/bin/` – diese Liste nur
+  bewusst erweitern.
 - Gelb-Trigger **nicht** wieder auf den allgemeinen `Notification`-Hook
   umstellen (feuert im Leerlauf → grundloses Gelb). Bei `AskUserQuestion`
   (PreToolUse) bzw. `permission_prompt` bleiben.

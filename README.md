@@ -59,7 +59,8 @@ Der Installer:
 2. kopiert die Cleware-Tools nach `/usr/src/cleware/` und setzt `USBswitchCmd`
    auf **setuid root** (`chmod 4755`), damit der USB-Zugriff ohne `sudo` klappt,
 3. installiert den Dispatcher nach `/usr/local/bin/claude-signal` und die
-   Signal-Verzeichnisse nach `/etc/claude-ampel/`,
+   Signal-Verzeichnisse nach `/etc/claude-ampel/` (und entfernt dabei verwaiste
+   Alt-Skripte `claude_on_*.sh`/`claude_off.sh` aus `/usr/local/bin/`),
 4. trägt die Hooks in die `~/.claude/settings.json` des aufrufenden Users ein
    (per `jq`-Merge; vorhandene Einstellungen und fremde Hooks bleiben erhalten,
    alte `claude_on_*.sh`-Einträge werden auf `claude-signal` migriert).

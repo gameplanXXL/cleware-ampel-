@@ -64,6 +64,15 @@ chown -R root:root /etc/claude-ampel
 find /etc/claude-ampel -type f -name '*.sh' -exec chmod 0755 {} +
 chmod 0644 /etc/claude-ampel/lib.sh   # wird nur gesourct, nicht ausgeführt
 
+# 2c. Verwaiste Hook-Skripte frueherer Installationen aus /usr/local/bin/
+#     entfernen. Es werden ausschliesslich unsere bekannten Altdateien geloescht.
+echo "    Entferne verwaiste Alt-Skripte aus /usr/local/bin/ ..."
+for old in claude_on_start.sh claude_on_ask.sh claude_on_stop.sh claude_off.sh; do
+    if [ -e "/usr/local/bin/$old" ]; then
+        rm -f "/usr/local/bin/$old" && echo "      entfernt: /usr/local/bin/$old"
+    fi
+done
+
 # 3. Claude-Code-Hooks in der settings.json des aufrufenden Users einrichten.
 #    Bei sudo ist das der echte Aufrufer (SUDO_USER), nicht root – sonst landet
 #    die Konfig im falschen Home und gehoert anschliessend root.
