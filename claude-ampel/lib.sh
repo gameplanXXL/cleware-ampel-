@@ -10,13 +10,55 @@ CLAUDE_AMPEL_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Pfad zum Cleware-Schaltbefehl – zentral, damit er nur hier zu pflegen ist.
 : "${USBSWITCH_CMD:=/usr/src/cleware/USBswitchCmd}"
 
+# USB-Vendor-ID der Cleware GmbH. Dient zur verlässlichen Erkennung, ob überhaupt
+# eine Ampel am USB-Bus hängt – der Schaltbefehl selbst meldet das NICHT zuverlässig
+# (er liefert auch ohne Hardware Status 0), darum prüfen wir die physische Präsenz
+# über sysfs. Zentral pflegbar.
+: "${CLEWARE_USB_VENDOR:=0d50}"
+
 # PID-Dateien der verwalteten Hintergrundjobs (pro User).
 OFF_TIMER_PID="/tmp/claude_off_timer_${USER:-$(id -un)}.pid"
 RING_PID="/tmp/claude_ring_${USER:-$(id -un)}.pid"
 
-# Schaltet die Ampel (R|Y|G|0), sofern das Binary vorhanden ist.
+# Prüft (read-only über sysfs), ob eine Cleware-USB-Ampel am Bus hängt.
+# Liefert 0 = vorhanden, 1 = nicht gefunden. Bewusst nicht über USBswitchCmd, da
+# dessen Geräteliste unzuverlässig ist (meldet auch ohne Hardware ein „Gerät").
+ampel_present() {
+    grep -qix "$CLEWARE_USB_VENDOR" /sys/bus/usb/devices/*/idVendor 2>/dev/null
+}
+
+# Schaltet die Ampel (R|Y|G|0). Bei Problemen wird eine deutliche Fehlermeldung
+# nach stderr geschrieben und ein von 0 verschiedener Status zurückgegeben:
+#   - Schaltbefehl fehlt / nicht ausführbar
+#   - keine Ampel eingesteckt (USB-Gerät nicht gefunden)
+#   - Schalten schlägt trotz vorhandener Ampel fehl
 ampel() {
-    [ -x "$USBSWITCH_CMD" ] && "$USBSWITCH_CMD" "$1"
+    local color="$1" out rc
+
+    if [ ! -x "$USBSWITCH_CMD" ]; then
+        echo "claude-ampel: FEHLER – Cleware-Schaltbefehl nicht gefunden oder nicht ausführbar:" >&2
+        echo "claude-ampel:   $USBSWITCH_CMD" >&2
+        echo "claude-ampel: Bitte den Installer ausführen (cleware-install.sh baut/installiert USBswitchCmd)." >&2
+        return 1
+    fi
+
+    if ! ampel_present; then
+        echo "claude-ampel: FEHLER – keine Cleware-USB-Ampel gefunden – ist sie eingesteckt?" >&2
+        echo "claude-ampel: Erwartet wird ein USB-Gerät mit Vendor-ID $CLEWARE_USB_VENDOR. Prüfen mit:" >&2
+        echo "claude-ampel:   lsusb | grep -i $CLEWARE_USB_VENDOR" >&2
+        return 1
+    fi
+
+    # Ausgabe einsammeln, damit wir bei Erfolg ruhig bleiben (Hook-Kontext) und
+    # nur im Fehlerfall die Originalmeldung des Binaries mit anzeigen.
+    out="$("$USBSWITCH_CMD" "$color" 2>&1)"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+        echo "claude-ampel: FEHLER – Ampel gefunden, aber Schalten fehlgeschlagen (Farbe: $color, Status $rc)." >&2
+        [ -n "$out" ] && echo "claude-ampel: Meldung von USBswitchCmd: $out" >&2
+        return "$rc"
+    fi
+    return 0
 }
 
 # Bricht einen via job_spawn gestarteten Hintergrundjob ab (per PGID).
