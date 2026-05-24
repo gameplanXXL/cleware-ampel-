@@ -9,8 +9,10 @@ Steuert eine **Cleware USB-Ampel** als Statusanzeige für [Claude Code](https://
 | 🟢 Grün | Claude hat einen Zwischenschritt erreicht oder ist fertig (danach 5-Min-Timer bis „aus“) |
 | ⚫ Aus | nichts läuft / Timer abgelaufen |
 
-Umgesetzt über Claude-Code-Hooks, die kleine Shell-Skripte aufrufen, welche
-wiederum das Cleware-Tool `USBswitchCmd` ansteuern.
+Umgesetzt über Claude-Code-Hooks, die einen **Dispatcher** (`claude-signal`)
+aufrufen. Dieser führt – wie `/etc/cron.daily` – alle Skripte im passenden
+Signal-Verzeichnis aus. Die Ampel ist nur eines dieser Skripte; weitere Aktionen
+(z. B. ein Ring-Ton) lassen sich einfach dazulegen.
 
 > **Hardware & Software:** Beschreibung der Ampel und Download der
 > Cleware-Software unter <https://www.cleware-shop.de/>.
@@ -18,15 +20,19 @@ wiederum das Cleware-Tool `USBswitchCmd` ansteuern.
 ## Aufbau
 
 ```
-bin/                  Hook-Skripte für Claude Code
-  claude_on_start.sh  -> Ampel rot   (Arbeit beginnt, Off-Timer wird gestoppt)
-  claude_on_ask.sh    -> Ampel gelb  (echte Rückfrage, Off-Timer wird gestoppt)
-  claude_on_stop.sh   -> Ampel grün  (Zwischenschritt/fertig, startet 5-Min-Off-Timer)
-  claude_off.sh       -> Ampel aus
+bin/
+  claude-signal       Dispatcher: führt /etc/claude-ampel/<signal>.d/* aus
+                      (-> /usr/local/bin/claude-signal)
+claude-ampel/         Inhalt für /etc/claude-ampel/ (Signal-Verzeichnisse)
+  lib.sh              gemeinsame Helfer (ampel, Timer, Ring)  – wird gesourct
+  ring.sh             spielt den Ring-Ton 5x im Minutenabstand
+  start.d/            Signal "start" (rot):  10-ampel.sh, 20-ring.sh (Ring stoppen)
+  ask.d/              Signal "ask"  (gelb): 10-ampel.sh, 20-ring.sh (Ring starten)
+  stop.d/             Signal "stop" (grün): 10-ampel.sh, 20-ring.sh (Ring starten)
 cleware/              Cleware-Hersteller-Tools (C/C++-Quellen, Makefile, Binaries)
   USBswitchCmd        Programm zum Schalten der Ampel/Switches (GPLv3)
   ...                 weitere Beispiel-Tools der Cleware GmbH
-cleware-install.sh    Installer (Tools + Hook-Skripte systemweit installieren)
+cleware-install.sh    Installer (Tools + Dispatcher + Signal-Verzeichnisse + Hooks)
 ```
 
 ## Voraussetzungen
@@ -52,9 +58,11 @@ Der Installer:
    das mitgelieferte Binary,
 2. kopiert die Cleware-Tools nach `/usr/src/cleware/` und setzt `USBswitchCmd`
    auf **setuid root** (`chmod 4755`), damit der USB-Zugriff ohne `sudo` klappt,
-3. installiert die Hook-Skripte nach `/usr/local/bin/`,
+3. installiert den Dispatcher nach `/usr/local/bin/claude-signal` und die
+   Signal-Verzeichnisse nach `/etc/claude-ampel/`,
 4. trägt die Hooks in die `~/.claude/settings.json` des aufrufenden Users ein
-   (per `jq`-Merge; vorhandene Einstellungen bleiben erhalten).
+   (per `jq`-Merge; vorhandene Einstellungen und fremde Hooks bleiben erhalten,
+   alte `claude_on_*.sh`-Einträge werden auf `claude-signal` migriert).
 
 > Hinweis: Es muss **kein Tar-Archiv** mehr entpackt werden – der Installer
 > arbeitet direkt mit dem ausgecheckten Git-Repo.
@@ -62,36 +70,72 @@ Der Installer:
 ### Smoke-Test
 
 ```bash
-/usr/local/bin/claude_on_start.sh   # Ampel rot
-/usr/local/bin/claude_on_ask.sh     # Ampel gelb
-/usr/local/bin/claude_on_stop.sh    # Ampel grün, 5-Min-Timer läuft
-/usr/local/bin/claude_off.sh        # Ampel aus
+/usr/local/bin/claude-signal start   # Ampel rot
+/usr/local/bin/claude-signal ask     # Ampel gelb + Ring-Ton (5x im Minutenabstand)
+/usr/local/bin/claude-signal stop    # Ampel grün, 5-Min-Timer + Ring-Ton
+/usr/src/cleware/USBswitchCmd 0      # Ampel aus
 ```
 
 ## Anbindung an Claude Code
 
-Die Skripte sind als Claude-Code-Hooks gedacht. Der Installer trägt diese
-Zuordnung automatisch in die `~/.claude/settings.json` ein:
+Die Hooks rufen den Dispatcher `claude-signal <signal>` auf. Der Installer trägt
+diese Zuordnung automatisch in die `~/.claude/settings.json` ein:
 
-| Hook-Ereignis | Skript | Ampel |
-|---------------|--------|-------|
-| `UserPromptSubmit` | `/usr/local/bin/claude_on_start.sh` | rot |
-| `PreToolUse` (Matcher `AskUserQuestion`) | `/usr/local/bin/claude_on_ask.sh` | gelb |
-| `Notification` (Matcher `permission_prompt`) | `/usr/local/bin/claude_on_ask.sh` | gelb |
-| `Stop` | `/usr/local/bin/claude_on_stop.sh` | grün |
+| Hook-Ereignis | Dispatcher-Aufruf | Signal / Ampel |
+|---------------|-------------------|----------------|
+| `UserPromptSubmit` | `claude-signal start` | rot |
+| `PreToolUse` (Matcher `AskUserQuestion`) | `claude-signal ask` | gelb |
+| `PostToolUse` (Matcher `AskUserQuestion`) | `claude-signal start` | rot |
+| `Notification` (Matcher `permission_prompt`) | `claude-signal ask` | gelb |
+| `Stop` | `claude-signal stop` | grün |
 
-**Gelb gezielt:** Es wird bewusst **nicht** mehr der allgemeine `Notification`-Hook
+**Gelb gezielt:** Es wird bewusst **nicht** der allgemeine `Notification`-Hook
 verwendet, weil dieser auch im Leerlauf (~60 s nach Turn-Ende) feuert und die
-Ampel dann fälschlich gelb färbte. Gelb erscheint nur noch, wenn Claude
-tatsächlich blockiert ist und auf eine Antwort wartet – also beim Frage-Tool
+Ampel dann fälschlich gelb färbte. Gelb erscheint nur, wenn Claude tatsächlich
+blockiert ist und auf eine Antwort wartet – also beim Frage-Tool
 `AskUserQuestion` oder einer Berechtigungsanfrage. Eine frei in Prosa gestellte
 Frage lässt sich über Hooks nicht zuverlässig erkennen; ein solcher Turn endet
 mit `Stop` und zeigt daher **grün**.
 
-`claude_on_stop.sh` startet einen Hintergrund-Timer (Standard: 300 s), der die
-Ampel danach via `claude_off.sh` ausschaltet. Ein erneuter Start (`rot`/`gelb`)
-bricht einen noch laufenden Off-Timer ab. Der Timer-PID wird in
-`/tmp/claude_off_timer_$USER.pid` abgelegt.
+`stop.d/10-ampel.sh` startet einen Hintergrund-Timer (Standard: 300 s), der die
+Ampel danach ausschaltet. Ein erneutes `start`/`ask` bricht einen noch laufenden
+Off-Timer ab. Die Timer-PID liegt in `/tmp/claude_off_timer_$USER.pid`.
+
+## Eigene Aktionen hinzufügen
+
+Wie bei `/etc/cron.daily`: ein **ausführbares** Skript in das passende
+Verzeichnis legen, fertig.
+
+```bash
+sudo tee /etc/claude-ampel/stop.d/30-desktop-notify.sh >/dev/null <<'EOF'
+#!/bin/bash
+notify-send "Claude" "Schritt erledigt."
+EOF
+sudo chmod +x /etc/claude-ampel/stop.d/30-desktop-notify.sh
+```
+
+Die Skripte laufen in alphabetischer Reihenfolge (daher die Präfixe `10-`,
+`20-`, …). Helfer aus `lib.sh` (`ampel`, `job_spawn`, `job_cancel`, …) stehen nach
+`. "$(dirname "$0")/../lib.sh"` bereit; der Signalname liegt in `$CLAUDE_SIGNAL`.
+Lang laufende Aktionen müssen sich selbst in den Hintergrund schicken, damit der
+Hook nicht blockiert.
+
+## Ring-Ton
+
+Bei `ask` (Rückfrage) und `stop` (fertig) spielt `ring.sh` einen Ton **5× im
+Abstand von einer Minute** – als akustische Erinnerung, falls die Ampel gerade
+nicht im Blick ist. Beim nächsten `start` wird der Ton abgebrochen. Steuerbar
+über Umgebungsvariablen (z. B. in der `settings.json` unter `env` oder global):
+
+| Variable | Default | Bedeutung |
+|----------|---------|-----------|
+| `CLAUDE_RING_COUNT` | `5` | Anzahl der Töne |
+| `CLAUDE_RING_INTERVAL` | `60` | Sekunden zwischen den Tönen |
+| `CLAUDE_RING_SOUND` | (System-Sound) | Pfad zu einer eigenen Sounddatei |
+
+Der Player wird automatisch gewählt (`paplay`, `pw-play`, `ffplay`, `play`,
+`aplay`). Findet sich kein Player oder Sound, ertönt ersatzweise die
+Terminal-Glocke.
 
 ## `USBswitchCmd` direkt nutzen
 

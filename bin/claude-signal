@@ -1,0 +1,36 @@
+#!/bin/bash
+# claude-signal — Dispatcher für Claude-Code-Statussignale.
+#
+# Führt alle ausführbaren Skripte im zum Signal gehörenden Verzeichnis aus,
+# analog zu /etc/cron.daily. Eigene Aktionen (Ampel, Ton, Desktop-Notify, …)
+# einfach als ausführbares Skript unter /etc/claude-ampel/<signal>.d/ ablegen.
+#
+# Aufruf:  claude-signal <start|ask|stop>
+#
+# Basisverzeichnis ist /etc/claude-ampel, per CLAUDE_AMPEL_DIR überschreibbar
+# (v. a. für Tests). Die Skripte werden in alphabetischer Reihenfolge gestartet
+# (daher die Zahlen-Präfixe 10-, 20-, …); ein Fehler bricht die übrigen nicht ab.
+
+set -u
+
+BASE_DIR="${CLAUDE_AMPEL_DIR:-/etc/claude-ampel}"
+SIGNAL="${1:-}"
+
+case "$SIGNAL" in
+    start|ask|stop) ;;
+    *)
+        echo "Aufruf: $(basename "$0") <start|ask|stop>" >&2
+        exit 2
+        ;;
+esac
+
+SIGNAL_DIR="$BASE_DIR/$SIGNAL.d"
+[ -d "$SIGNAL_DIR" ] || exit 0
+
+# Signalname für die Drop-in-Skripte verfügbar machen.
+export CLAUDE_SIGNAL="$SIGNAL"
+
+for script in "$SIGNAL_DIR"/*; do
+    [ -f "$script" ] && [ -x "$script" ] || continue
+    "$script" || echo "claude-signal: $script -> Status $?" >&2
+done
