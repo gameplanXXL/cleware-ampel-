@@ -61,12 +61,18 @@ ampel() {
     return 0
 }
 
-# Schaltet die Ampel komplett aus. Der Cleware-Ampel-Multiplexer hat immer nur
-# einen Kanal an; daher erst Rot (definierter Kanal) einschalten und dann diesen
-# Kanal wieder ausschalten -> alle Lampen aus. Etwaige Fehlermeldungen (z. B. keine
-# Ampel eingesteckt) kommen aus ampel(); bei Fehler entfällt der zweite Schritt.
+# Schaltet die Ampel komplett aus – mit dem dedizierten Aus-Befehl "O" (Buchstabe).
+# USBswitchCmd kennt "O" als "alle Lampen aus" und schaltet rot, grün UND gelb in
+# EINEM Aufruf ab (siehe Hilfe: "r | y | g | o turns red, yellow, green on or all off"
+# bzw. cleware/USBswitchCmd.cpp). Wichtig: NICHT die Ziffer 0 nehmen – die schaltet
+# nur den roten Kanal (Switch 0) ab und ließe Grün/Gelb an.
+#
+# Früher wurde hier "ampel R && ampel 0" benutzt (erst Rot an, dann Rot-Kanal aus).
+# Das sind zwei getrennte USB-Befehle, weshalb die Ampel bei JEDEM Ausschalten kurz
+# sichtbar ROT blitzte, bevor sie ausging ("von Rot auf Aus"). "O" vermeidet das.
+# Etwaige Fehlermeldungen (z. B. keine Ampel eingesteckt) kommen aus ampel().
 ampel_off() {
-    ampel R && ampel 0
+    ampel O
 }
 
 # Bricht einen via job_spawn gestarteten Hintergrundjob ab (per PGID).

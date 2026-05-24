@@ -51,11 +51,13 @@ Mitgelieferte Drop-ins je Verzeichnis:
 - `stop.d/`  → `10-ampel.sh` (grün + Off-Timer armen), `20-ring.sh` (Ring starten)
 - `off.d/`   → `10-ampel.sh` (aus + Off-Timer stoppen), `20-ring.sh` (Ring stoppen)
 
-Die Drop-ins sourcen `../lib.sh` und nutzen deren Helfer: `ampel <R|Y|G|0>` schaltet
+Die Drop-ins sourcen `../lib.sh` und nutzen deren Helfer: `ampel <R|Y|G|O>` schaltet
 die Ampel über `/usr/src/cleware/USBswitchCmd` (USB-Zugriff → bei Installation
-**setuid root**, `chmod 4755`), `ampel_off` schaltet sie komplett aus (Multiplexer:
-erst Rot an, dann diesen Kanal aus), `off_timer_arm`/`off_timer_cancel` verwalten den
-Abschalt-Timer, `ring_start`/`ring_cancel` den Ring-Ton.
+**setuid root**, `chmod 4755`), `ampel_off` schaltet sie komplett aus (über den
+Aus-Befehl `O`, der rot/grün/gelb in **einem** Aufruf abschaltet – kein Zwischen-Rot;
+Achtung: die Ziffer `0` schaltet nur den roten Kanal),
+`off_timer_arm`/`off_timer_cancel` verwalten den Abschalt-Timer,
+`ring_start`/`ring_cancel` den Ring-Ton.
 
 `PostToolUse`/`AskUserQuestion` feuert, wenn die Frage **beantwortet** ist und
 Claude weiterarbeitet – so wechselt die Ampel von gelb zurück auf rot (und der
