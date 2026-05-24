@@ -25,7 +25,7 @@ bin/
                       (-> /usr/local/bin/claude-signal)
 claude-ampel/         Inhalt für /etc/claude-ampel/ (Signal-Verzeichnisse)
   lib.sh              gemeinsame Helfer (ampel, Timer, Ring)  – wird gesourct
-  ring.sh             spielt den Ring-Ton einmalig 3x direkt hintereinander
+  ring.sh             spielt den Ring-Ton einmalig
   start.d/            Signal "start" (rot):  10-ampel.sh, 20-ring.sh (Ring stoppen)
   ask.d/              Signal "ask"  (gelb): 10-ampel.sh, 20-ring.sh (Ring starten)
   stop.d/             Signal "stop" (grün): 10-ampel.sh, 20-ring.sh (Ring starten)
@@ -73,7 +73,7 @@ Der Installer:
 
 ```bash
 /usr/local/bin/claude-signal start   # Ampel rot
-/usr/local/bin/claude-signal ask     # Ampel gelb + Ring-Ton (einmalig 3x hintereinander)
+/usr/local/bin/claude-signal ask     # Ampel gelb + Ring-Ton (einmalig)
 /usr/local/bin/claude-signal stop    # Ampel grün, 5-Min-Timer + Ring-Ton
 /usr/local/bin/claude-signal off     # Ampel ganz aus, Timer + Ring-Ton stoppen
 ```
@@ -128,15 +128,15 @@ Hook nicht blockiert.
 
 ## Ring-Ton
 
-Bei `ask` (Rückfrage) und `stop` (fertig) spielt `ring.sh` einen Ton **einmalig
-3× direkt hintereinander** – als akustische Erinnerung, falls die Ampel gerade
-nicht im Blick ist. Kein dauerhaftes Klingeln: nach den 3 Tönen ist Ruhe. Beim
+Bei `ask` (Rückfrage) und `stop` (fertig) spielt `ring.sh` einen Ton
+**einmalig** – als akustische Erinnerung, falls die Ampel gerade
+nicht im Blick ist. Kein dauerhaftes Klingeln: nach dem Ton ist Ruhe. Beim
 nächsten `start` wird ein noch laufender Ton abgebrochen. Steuerbar über
 Umgebungsvariablen (z. B. in der `settings.json` unter `env` oder global):
 
 | Variable | Default | Bedeutung |
 |----------|---------|-----------|
-| `CLAUDE_RING_COUNT` | `3` | Anzahl der Töne |
+| `CLAUDE_RING_COUNT` | `1` | Anzahl der Töne |
 | `CLAUDE_RING_INTERVAL` | `0` | Sekunden zwischen den Tönen (0 ⇒ direkt hintereinander) |
 | `CLAUDE_RING_SOUND` | (System-Sound) | Pfad zu einer eigenen Sounddatei |
 
