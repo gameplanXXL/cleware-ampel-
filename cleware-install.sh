@@ -52,7 +52,7 @@ chmod 4755 /usr/src/cleware/USBswitchCmd   # setuid root für USB-Zugriff
 echo "    Installiere Dispatcher nach /usr/local/bin/claude-signal ..."
 install -m 0755 "$SCRIPT_DIR/bin/claude-signal" /usr/local/bin/claude-signal
 
-# 2b. Signal-Verzeichnisse (start.d/ask.d/stop.d + lib.sh, ring.sh) nach
+# 2b. Signal-Verzeichnisse (start.d/ask.d/stop.d/off.d + lib.sh, ring.sh) nach
 #     /etc/claude-ampel/. Eigene Aktionen lassen sich dort einfach als
 #     ausführbares Skript ablegen (analog zu /etc/cron.daily). Bereits vorhandene
 #     Fremd-Skripte in den Verzeichnissen bleiben erhalten – cp überschreibt nur
@@ -164,7 +164,7 @@ echo ""
 echo "Fertig."
 echo "  Cleware-Binaries : /usr/src/cleware/"
 echo "  Dispatcher       : /usr/local/bin/claude-signal"
-echo "  Signal-Skripte   : /etc/claude-ampel/{start,ask,stop}.d/"
+echo "  Signal-Skripte   : /etc/claude-ampel/{start,ask,stop,off}.d/"
 echo "                     (eigene Aktionen einfach als ausführbares Skript dort ablegen)"
 echo "  Claude-Hooks     : ${SETTINGS:-(uebersprungen)}"
 echo ""
@@ -172,4 +172,4 @@ echo "Smoke-Test:"
 echo "  /usr/local/bin/claude-signal start   # Ampel rot"
 echo "  /usr/local/bin/claude-signal ask     # Ampel gelb + Ring-Ton (5x, alle 20 s = 3x/Min)"
 echo "  /usr/local/bin/claude-signal stop    # Ampel grün, 5-Min-Timer + Ring-Ton"
-echo "  USBSWITCH_CMD-Aus : /usr/src/cleware/USBswitchCmd 0   # Ampel aus"
+echo "  /usr/local/bin/claude-signal off     # Ampel ganz aus, Timer + Ring-Ton stoppen"

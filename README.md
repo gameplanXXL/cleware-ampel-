@@ -29,6 +29,7 @@ claude-ampel/         Inhalt für /etc/claude-ampel/ (Signal-Verzeichnisse)
   start.d/            Signal "start" (rot):  10-ampel.sh, 20-ring.sh (Ring stoppen)
   ask.d/              Signal "ask"  (gelb): 10-ampel.sh, 20-ring.sh (Ring starten)
   stop.d/             Signal "stop" (grün): 10-ampel.sh, 20-ring.sh (Ring starten)
+  off.d/              Signal "off"  (aus):  10-ampel.sh, 20-ring.sh (Ring stoppen)
 cleware/              Cleware-Hersteller-Tools (C/C++-Quellen, Makefile, Binaries)
   USBswitchCmd        Programm zum Schalten der Ampel/Switches (GPLv3)
   ...                 weitere Beispiel-Tools der Cleware GmbH
@@ -74,7 +75,7 @@ Der Installer:
 /usr/local/bin/claude-signal start   # Ampel rot
 /usr/local/bin/claude-signal ask     # Ampel gelb + Ring-Ton (5x, alle 20 s = 3x/Min)
 /usr/local/bin/claude-signal stop    # Ampel grün, 5-Min-Timer + Ring-Ton
-/usr/src/cleware/USBswitchCmd 0      # Ampel aus
+/usr/local/bin/claude-signal off     # Ampel ganz aus, Timer + Ring-Ton stoppen
 ```
 
 ## Anbindung an Claude Code
@@ -90,6 +91,10 @@ diese Zuordnung automatisch in die `~/.claude/settings.json` ein:
 | `Notification` (Matcher `permission_prompt`) | `claude-signal ask` | gelb |
 | `Stop` | `claude-signal stop` | grün |
 
+Zusätzlich gibt es `claude-signal off` (Ampel ganz aus, Timer + Ring-Ton stoppen).
+Es ist **keinem Hook zugeordnet**, sondern ein manueller Befehl zum sofortigen
+Ausschalten – im Normalbetrieb erledigt das ohnehin der 5-Min-Timer nach `stop`.
+
 **Gelb gezielt:** Es wird bewusst **nicht** der allgemeine `Notification`-Hook
 verwendet, weil dieser auch im Leerlauf (~60 s nach Turn-Ende) feuert und die
 Ampel dann fälschlich gelb färbte. Gelb erscheint nur, wenn Claude tatsächlich
@@ -99,8 +104,8 @@ Frage lässt sich über Hooks nicht zuverlässig erkennen; ein solcher Turn ende
 mit `Stop` und zeigt daher **grün**.
 
 `stop.d/10-ampel.sh` startet einen Hintergrund-Timer (Standard: 300 s), der die
-Ampel danach ausschaltet. Ein erneutes `start`/`ask` bricht einen noch laufenden
-Off-Timer ab. Die Timer-PID liegt in `/tmp/claude_off_timer_$USER.pid`.
+Ampel danach ausschaltet. Ein erneutes `start`/`ask`/`off` bricht einen noch
+laufenden Off-Timer ab. Die Timer-PID liegt in `/tmp/claude_off_timer_$USER.pid`.
 
 ## Eigene Aktionen hinzufügen
 

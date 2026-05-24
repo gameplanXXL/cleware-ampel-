@@ -11,12 +11,12 @@ fertig (mit 5-Min-Abschalt-Timer), aus = nichts läuft.
 
 ## Struktur
 
-- `bin/claude-signal` – **Dispatcher**. Bekommt ein Signal (`start|ask|stop`) und
+- `bin/claude-signal` – **Dispatcher**. Bekommt ein Signal (`start|ask|stop|off`) und
   führt alle ausführbaren Skripte im passenden Verzeichnis aus (analog zu
   `/etc/cron.daily`). Wird nach `/usr/local/bin/claude-signal` installiert.
-- `claude-ampel/` – Inhalt für `/etc/claude-ampel/`: die drei Signal-Verzeichnisse
-  `start.d/`, `ask.d/`, `stop.d/` mit den mitgelieferten Drop-in-Skripten, dazu
-  die geteilte `lib.sh` und der Ton-Player `ring.sh`. **Hier liegt die Logik.**
+- `claude-ampel/` – Inhalt für `/etc/claude-ampel/`: die vier Signal-Verzeichnisse
+  `start.d/`, `ask.d/`, `stop.d/`, `off.d/` mit den mitgelieferten Drop-in-Skripten,
+  dazu die geteilte `lib.sh` und der Ton-Player `ring.sh`. **Hier liegt die Logik.**
 - `cleware/` – **Fremdcode der Cleware GmbH** (GPLv3): C/C++-Quellen, `Makefile`
   und vorgebaute Binaries. Hier in der Regel **nichts ändern** – nur das Binary
   `USBswitchCmd` wird benötigt.
@@ -24,7 +24,7 @@ fertig (mit 5-Min-Abschalt-Timer), aus = nichts läuft.
 
 ## Wie es zusammenhängt
 
-Der Kerngedanke: Statt fest verdrahteter Aktionen gibt es **drei Signal-Verzeichnisse**
+Der Kerngedanke: Statt fest verdrahteter Aktionen gibt es **vier Signal-Verzeichnisse**
 unter `/etc/claude-ampel/`, in die man – wie bei `/etc/cron.daily` – beliebige
 ausführbare Skripte ablegen kann. Die Ampel selbst ist nur noch eines dieser
 Drop-ins, der Ring-Ton ein weiteres.
@@ -39,15 +39,22 @@ Installer in die `~/.claude/settings.json` des aufrufenden Users:
 - `Notification` mit Matcher `permission_prompt` → `claude-signal ask` (gelb)
 - `Stop` → `claude-signal stop` (grün)
 
+Das vierte Signal `off` (Ampel ganz aus) ist **keinem Hook zugeordnet** – es ist ein
+manueller Befehl zum sofortigen Ausschalten (`claude-signal off`), z. B. zum Aufräumen
+oder um es selbst an einen Hook zu hängen. Im Normalbetrieb schaltet ohnehin der
+5-Min-Off-Timer nach `stop` aus.
+
 Mitgelieferte Drop-ins je Verzeichnis:
 
 - `start.d/` → `10-ampel.sh` (rot + Off-Timer stoppen), `20-ring.sh` (Ring stoppen)
 - `ask.d/`   → `10-ampel.sh` (gelb + Off-Timer stoppen), `20-ring.sh` (Ring starten)
 - `stop.d/`  → `10-ampel.sh` (grün + Off-Timer armen), `20-ring.sh` (Ring starten)
+- `off.d/`   → `10-ampel.sh` (aus + Off-Timer stoppen), `20-ring.sh` (Ring stoppen)
 
 Die Drop-ins sourcen `../lib.sh` und nutzen deren Helfer: `ampel <R|Y|G|0>` schaltet
 die Ampel über `/usr/src/cleware/USBswitchCmd` (USB-Zugriff → bei Installation
-**setuid root**, `chmod 4755`), `off_timer_arm`/`off_timer_cancel` verwalten den
+**setuid root**, `chmod 4755`), `ampel_off` schaltet sie komplett aus (Multiplexer:
+erst Rot an, dann diesen Kanal aus), `off_timer_arm`/`off_timer_cancel` verwalten den
 Abschalt-Timer, `ring_start`/`ring_cancel` den Ring-Ton.
 
 `PostToolUse`/`AskUserQuestion` feuert, wenn die Frage **beantwortet** ist und
@@ -62,7 +69,7 @@ Prosa-Fragen sind über Hooks nicht erkennbar; ein solcher Turn endet mit `Stop`
 
 `stop.d/10-ampel.sh` startet einen Hintergrund-Off-Timer (Default 300 s, via
 `lib.sh` `off_timer_arm`) mit `setsid`; die PID (PGID) liegt in
-`/tmp/claude_off_timer_$USER.pid`. `start.d/`/`ask.d/` brechen ihn ab.
+`/tmp/claude_off_timer_$USER.pid`. `start.d/`/`ask.d/`/`off.d/` brechen ihn ab.
 
 Der **Ring-Ton** (`ring.sh`) spielt einen Ton **5× im Abstand von 20 Sekunden
 (3× pro Minute)** als Hintergrundjob (PID in `/tmp/claude_ring_$USER.pid`). `ask`

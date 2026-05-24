@@ -5,7 +5,7 @@
 # analog zu /etc/cron.daily. Eigene Aktionen (Ampel, Ton, Desktop-Notify, …)
 # einfach als ausführbares Skript unter /etc/claude-ampel/<signal>.d/ ablegen.
 #
-# Aufruf:  claude-signal <start|ask|stop>
+# Aufruf:  claude-signal <start|ask|stop|off>
 #
 # Basisverzeichnis ist /etc/claude-ampel, per CLAUDE_AMPEL_DIR überschreibbar
 # (v. a. für Tests). Die Skripte werden in alphabetischer Reihenfolge gestartet
@@ -17,9 +17,9 @@ BASE_DIR="${CLAUDE_AMPEL_DIR:-/etc/claude-ampel}"
 SIGNAL="${1:-}"
 
 case "$SIGNAL" in
-    start|ask|stop) ;;
+    start|ask|stop|off) ;;
     *)
-        echo "Aufruf: $(basename "$0") <start|ask|stop>" >&2
+        echo "Aufruf: $(basename "$0") <start|ask|stop|off>" >&2
         exit 2
         ;;
 esac

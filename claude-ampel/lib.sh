@@ -61,6 +61,14 @@ ampel() {
     return 0
 }
 
+# Schaltet die Ampel komplett aus. Der Cleware-Ampel-Multiplexer hat immer nur
+# einen Kanal an; daher erst Rot (definierter Kanal) einschalten und dann diesen
+# Kanal wieder ausschalten -> alle Lampen aus. Etwaige Fehlermeldungen (z. B. keine
+# Ampel eingesteckt) kommen aus ampel(); bei Fehler entfällt der zweite Schritt.
+ampel_off() {
+    ampel R && ampel 0
+}
+
 # Bricht einen via job_spawn gestarteten Hintergrundjob ab (per PGID).
 job_cancel() {
     local pidfile="$1" pid
@@ -87,8 +95,10 @@ job_spawn() {
 off_timer_arm() {
     local delay="${CLAUDE_OFF_DELAY:-300}"
     job_cancel "$OFF_TIMER_PID"
+    # Der Hintergrundjob läuft in einer frischen Shell ohne unsere Funktionen –
+    # daher lib.sh erneut sourcen und die zentrale ampel_off nutzen.
     job_spawn "$OFF_TIMER_PID" \
-        "sleep $delay && { \"$USBSWITCH_CMD\" R; \"$USBSWITCH_CMD\" 0; }"
+        "sleep $delay && . \"$CLAUDE_AMPEL_LIB_DIR/lib.sh\" && ampel_off"
 }
 
 # Off-Timer abbrechen.
