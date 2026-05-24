@@ -25,7 +25,7 @@ bin/
                       (-> /usr/local/bin/claude-signal)
 claude-ampel/         Inhalt für /etc/claude-ampel/ (Signal-Verzeichnisse)
   lib.sh              gemeinsame Helfer (ampel, Timer, Ring)  – wird gesourct
-  ring.sh             spielt den Ring-Ton 5x im Minutenabstand
+  ring.sh             spielt den Ring-Ton 5x im 20-Sekunden-Abstand (3x/Min)
   start.d/            Signal "start" (rot):  10-ampel.sh, 20-ring.sh (Ring stoppen)
   ask.d/              Signal "ask"  (gelb): 10-ampel.sh, 20-ring.sh (Ring starten)
   stop.d/             Signal "stop" (grün): 10-ampel.sh, 20-ring.sh (Ring starten)
@@ -72,7 +72,7 @@ Der Installer:
 
 ```bash
 /usr/local/bin/claude-signal start   # Ampel rot
-/usr/local/bin/claude-signal ask     # Ampel gelb + Ring-Ton (5x im Minutenabstand)
+/usr/local/bin/claude-signal ask     # Ampel gelb + Ring-Ton (5x, alle 20 s = 3x/Min)
 /usr/local/bin/claude-signal stop    # Ampel grün, 5-Min-Timer + Ring-Ton
 /usr/src/cleware/USBswitchCmd 0      # Ampel aus
 ```
@@ -124,14 +124,14 @@ Hook nicht blockiert.
 ## Ring-Ton
 
 Bei `ask` (Rückfrage) und `stop` (fertig) spielt `ring.sh` einen Ton **5× im
-Abstand von einer Minute** – als akustische Erinnerung, falls die Ampel gerade
+Abstand von 20 Sekunden (3× pro Minute)** – als akustische Erinnerung, falls die Ampel gerade
 nicht im Blick ist. Beim nächsten `start` wird der Ton abgebrochen. Steuerbar
 über Umgebungsvariablen (z. B. in der `settings.json` unter `env` oder global):
 
 | Variable | Default | Bedeutung |
 |----------|---------|-----------|
 | `CLAUDE_RING_COUNT` | `5` | Anzahl der Töne |
-| `CLAUDE_RING_INTERVAL` | `60` | Sekunden zwischen den Tönen |
+| `CLAUDE_RING_INTERVAL` | `20` | Sekunden zwischen den Tönen (20 s ⇒ 3× pro Minute) |
 | `CLAUDE_RING_SOUND` | (System-Sound) | Pfad zu einer eigenen Sounddatei |
 
 Der Player wird automatisch gewählt (`paplay`, `pw-play`, `ffplay`, `play`,

@@ -64,10 +64,11 @@ Prosa-Fragen sind über Hooks nicht erkennbar; ein solcher Turn endet mit `Stop`
 `lib.sh` `off_timer_arm`) mit `setsid`; die PID (PGID) liegt in
 `/tmp/claude_off_timer_$USER.pid`. `start.d/`/`ask.d/` brechen ihn ab.
 
-Der **Ring-Ton** (`ring.sh`) spielt einen Ton **5× im Abstand von einer Minute**
-als Hintergrundjob (PID in `/tmp/claude_ring_$USER.pid`). `ask` und `stop` starten
-ihn, `start` bricht ihn ab. Einstellbar über Umgebungsvariablen `CLAUDE_RING_COUNT`
-(5), `CLAUDE_RING_INTERVAL` (60 s), `CLAUDE_RING_SOUND` (Pfad zur Sounddatei). Der
+Der **Ring-Ton** (`ring.sh`) spielt einen Ton **5× im Abstand von 20 Sekunden
+(3× pro Minute)** als Hintergrundjob (PID in `/tmp/claude_ring_$USER.pid`). `ask`
+und `stop` starten ihn, `start` bricht ihn ab. Einstellbar über Umgebungsvariablen
+`CLAUDE_RING_COUNT` (5), `CLAUDE_RING_INTERVAL` (20 s), `CLAUDE_RING_SOUND` (Pfad
+zur Sounddatei). Der
 Player wird automatisch gesucht (paplay/pw-play/ffplay/play/aplay), sonst ertönt
 die Terminal-Glocke.
 

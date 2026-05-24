@@ -5,14 +5,14 @@
 # Läuft als Hintergrundjob, gestartet über lib.sh ring_start. Einstellbar per
 # Umgebungsvariablen:
 #   CLAUDE_RING_COUNT     Anzahl der Töne            (Default 5)
-#   CLAUDE_RING_INTERVAL  Sekunden zwischen den Tönen (Default 60)
+#   CLAUDE_RING_INTERVAL  Sekunden zwischen den Tönen (Default 20 = 3× pro Minute)
 #   CLAUDE_RING_SOUND     Pfad zu einer Sounddatei   (sonst System-Sound)
 #
 # Findet sich kein Player/Sound, wird ersatzweise die Terminal-Glocke (BEL)
 # ausgegeben.
 
 COUNT="${CLAUDE_RING_COUNT:-5}"
-INTERVAL="${CLAUDE_RING_INTERVAL:-60}"
+INTERVAL="${CLAUDE_RING_INTERVAL:-20}"   # 20 s ⇒ 3× pro Minute
 
 # Erste lesbare Sounddatei ermitteln (oder die explizit vorgegebene).
 find_sound() {
