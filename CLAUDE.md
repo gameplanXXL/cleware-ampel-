@@ -13,7 +13,10 @@ fertig (mit 5-Min-Abschalt-Timer), aus = nichts läuft.
 
 - `bin/claude-signal` – **Dispatcher**. Bekommt ein Signal (`start|ask|stop|off`) und
   führt alle ausführbaren Skripte im passenden Verzeichnis aus (analog zu
-  `/etc/cron.daily`). Wird nach `/usr/local/bin/claude-signal` installiert.
+  `/etc/cron.daily`). Wird nach `/usr/local/bin/claude-signal` installiert. Liest das
+  von Claude Code per stdin gelieferte **Hook-JSON** einmal zentral ein, exportiert
+  daraus `CLAUDE_HOOK_EVENT`, `CLAUDE_AGENT_ID`, `CLAUDE_AGENT_TYPE` und das rohe
+  `CLAUDE_HOOK_JSON` für die Drop-ins und schreibt ein **Diagnose-Log** (siehe unten).
 - `claude-ampel/` – Inhalt für `/etc/claude-ampel/`: die vier Signal-Verzeichnisse
   `start.d/`, `ask.d/`, `stop.d/`, `off.d/` mit den mitgelieferten Drop-in-Skripten,
   dazu die geteilte `lib.sh` und der Ton-Player `ring.sh`. **Hier liegt die Logik.**
@@ -94,8 +97,27 @@ Einfach ein ausführbares Skript in das passende Verzeichnis legen, z. B.
 automatisch mit ausgeführt (alphabetische Reihenfolge → sinnvolle Zahlen-Präfixe
 wählen). Helfer aus `lib.sh` (`ampel`, `job_spawn`, `job_cancel`, …) stehen nach
 `. "$(dirname "$0")/../lib.sh"` zur Verfügung. Der Signalname liegt zusätzlich in
-`$CLAUDE_SIGNAL`. Lang laufende Aktionen müssen sich selbst in den Hintergrund
-schicken (siehe Off-Timer/Ring via `job_spawn`), damit der Hook nicht blockiert.
+`$CLAUDE_SIGNAL`; zum Hook-Kontext stehen `$CLAUDE_HOOK_EVENT` (echtes Event, z. B.
+`Stop` vs. `SubagentStop`), `$CLAUDE_AGENT_ID`, `$CLAUDE_AGENT_TYPE` und das rohe
+`$CLAUDE_HOOK_JSON` bereit. Lang laufende Aktionen müssen sich selbst in den
+Hintergrund schicken (siehe Off-Timer/Ring via `job_spawn`), damit der Hook nicht
+blockiert.
+
+## Diagnose-Log
+
+Der Dispatcher protokolliert jeden Aufruf zeilenweise (Zeitpunkt, Signal, echtes
+Hook-Event, Agent-Typ, rohes JSON) – damit lässt sich z. B. ein zu früh oder
+grundlos klingelnder Ton dem auslösenden Event zuordnen (klingeln nur `ask` und
+`stop`). Default-Pfad: `/tmp/claude-signal_<user>.log` (bei ~1 MB wird gekappt).
+
+- Live mitlesen: `tail -f /tmp/claude-signal_$USER.log`
+- Abschalten: Umgebungsvariable `CLAUDE_SIGNAL_LOG` leer (`""`) oder auf `off`
+  setzen (z. B. unter `"env"` in der `settings.json`); eigener Pfad über denselben
+  Namen.
+- Pattern für „Ton zu früh": ein `signal=stop event=Stop`, dem **ohne**
+  zwischenzeitliches `event=UserPromptSubmit` weitere Aktivität folgt → der
+  Haupt-Agent hat weitergearbeitet (z. B. wegen eines Hintergrund-Agenten), der
+  `stop`-Ton war also verfrüht.
 
 ## Konventionen
 

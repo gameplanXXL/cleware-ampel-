@@ -24,6 +24,50 @@ case "$SIGNAL" in
         ;;
 esac
 
+# --- Hook-JSON von stdin einlesen -------------------------------------------
+# Claude-Code-Hooks liefern auf stdin ein JSON mit Kontext (u. a.
+# hook_event_name, bei Sub-Agenten agent_id/agent_type). Das lesen wir EINMAL
+# zentral ein und stellen die wichtigsten Felder den Drop-ins als Umgebungs-
+# variablen bereit. So kann ein Drop-in z. B. echtes Stop (Haupt-Agent fertig)
+# von SubagentStop (nur ein Sub-Agent fertig) unterscheiden.
+#
+# Wichtig: nur im Hook-Kontext lesen. Bei manuellem Aufruf im Terminal
+# (z. B. `claude-signal off`) ist stdin ein Terminal – dann NICHT lesen, sonst
+# würde der Aufruf auf eine Eingabe warten/blockieren. timeout schützt zusätzlich
+# vor einer offenen, aber stummen Pipe.
+HOOK_JSON=""
+if [ ! -t 0 ]; then
+    HOOK_JSON="$(timeout 2 cat 2>/dev/null || true)"
+fi
+
+CLAUDE_HOOK_EVENT=""
+CLAUDE_AGENT_ID=""
+CLAUDE_AGENT_TYPE=""
+if [ -n "$HOOK_JSON" ] && command -v jq >/dev/null 2>&1; then
+    CLAUDE_HOOK_EVENT="$(printf '%s' "$HOOK_JSON" | jq -r '.hook_event_name // empty' 2>/dev/null || true)"
+    CLAUDE_AGENT_ID="$(printf '%s' "$HOOK_JSON" | jq -r '.agent_id // empty' 2>/dev/null || true)"
+    CLAUDE_AGENT_TYPE="$(printf '%s' "$HOOK_JSON" | jq -r '.agent_type // empty' 2>/dev/null || true)"
+fi
+export CLAUDE_HOOK_JSON="$HOOK_JSON"
+export CLAUDE_HOOK_EVENT CLAUDE_AGENT_ID CLAUDE_AGENT_TYPE
+
+# --- Ereignis-Log (Diagnose) ------------------------------------------------
+# Protokolliert pro Aufruf eine Zeile: Zeitpunkt, Signal, echtes Hook-Event und
+# das rohe JSON. Damit lässt sich ein zu früh/grundlos klingelnder Ton dem
+# auslösenden Event zuordnen. Default-Pfad: /tmp/claude-signal_<user>.log.
+# Abschalten: CLAUDE_SIGNAL_LOG leer ("") oder auf "off" setzen.
+LOG_FILE="${CLAUDE_SIGNAL_LOG-/tmp/claude-signal_${USER:-$(id -un)}.log}"
+if [ -n "$LOG_FILE" ] && [ "$LOG_FILE" != "off" ]; then
+    # Log bei Überlänge (~1 MB) kappen, damit es nicht unbegrenzt wächst.
+    if [ -f "$LOG_FILE" ] && [ "$(stat -c %s "$LOG_FILE" 2>/dev/null || echo 0)" -gt 1048576 ]; then
+        : > "$LOG_FILE" 2>/dev/null || true
+    fi
+    printf '%s signal=%-5s event=%-14s agent=%s json=%s\n' \
+        "$(date '+%Y-%m-%dT%H:%M:%S')" "$SIGNAL" "${CLAUDE_HOOK_EVENT:-?}" \
+        "${CLAUDE_AGENT_TYPE:-}" "$(printf '%s' "$HOOK_JSON" | tr '\n\t' '  ')" \
+        >> "$LOG_FILE" 2>/dev/null || true
+fi
+
 SIGNAL_DIR="$BASE_DIR/$SIGNAL.d"
 [ -d "$SIGNAL_DIR" ] || exit 0
 
