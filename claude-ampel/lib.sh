@@ -75,6 +75,19 @@ ampel_off() {
     ampel O
 }
 
+# Liefert 0 (wahr), wenn der aktuelle Aufruf das Fertigwerden eines SUB-AGENTEN
+# meldet – also NICHT der Haupt-Agent fertig ist, sondern nur ein per Task-Tool
+# gestarteter Unter-Agent. Erkannt am Hook-Event "SubagentStop" oder an einem
+# gesetzten agent_id (beides liefert der Dispatcher aus dem Hook-JSON als
+# CLAUDE_HOOK_EVENT/CLAUDE_AGENT_ID). Damit unterscheiden die stop-Drop-ins
+# "Haupt-Agent wirklich fertig" (echtes Stop → Ampel grün + Ton) von "nur ein
+# Sub-Agent fertig, Haupt-Agent arbeitet weiter" (nichts tun: Ampel bleibt rot,
+# kein Ton). Voraussetzung ist der aktuelle Dispatcher (exportiert diese Felder);
+# nach Code-Änderungen also den Installer erneut laufen lassen.
+is_subagent_stop() {
+    [ "${CLAUDE_HOOK_EVENT:-}" = "SubagentStop" ] || [ -n "${CLAUDE_AGENT_ID:-}" ]
+}
+
 # Bricht einen via job_spawn gestarteten Hintergrundjob ab (per PGID).
 job_cancel() {
     local pidfile="$1" pid

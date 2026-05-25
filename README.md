@@ -131,8 +131,15 @@ Hook nicht blockiert.
 Bei `ask` (Rückfrage) und `stop` (fertig) spielt `ring.sh` einen Ton
 **einmalig** – als akustische Erinnerung, falls die Ampel gerade
 nicht im Blick ist. Kein dauerhaftes Klingeln: nach dem Ton ist Ruhe. Beim
-nächsten `start` wird ein noch laufender Ton abgebrochen. Steuerbar über
-Umgebungsvariablen (z. B. in der `settings.json` unter `env` oder global):
+nächsten `start` wird ein noch laufender Ton abgebrochen.
+
+Beim `stop` wird **nicht** geklingelt (und auch nicht auf grün geschaltet),
+wenn nur ein per Task-Tool gestarteter **Unter-Agent** fertig ist, während die
+Haupt-Session weiterarbeitet (Hook-Event `SubagentStop`). Geklingelt wird nur,
+wenn der Haupt-Agent wirklich fertig ist.
+
+Steuerbar über Umgebungsvariablen (z. B. in der `settings.json` unter `env`
+oder global):
 
 | Variable | Default | Bedeutung |
 |----------|---------|-----------|

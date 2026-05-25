@@ -66,6 +66,16 @@ Achtung: die Ziffer `0` schaltet nur den roten Kanal),
 Claude weiterarbeitet – so wechselt die Ampel von gelb zurück auf rot (und der
 Ring stoppt), statt bis zum nächsten `Stop` (grün) gelb zu bleiben.
 
+**Sub-Agent-Stop unterdrücken:** Beide `stop.d`-Drop-ins prüfen über die
+`lib.sh`-Funktion `is_subagent_stop` zuerst, ob nur ein per Task-Tool
+gestarteter **Unter-Agent** fertig ist (Hook-Event `SubagentStop` bzw. gesetztes
+`agent_id`). In dem Fall steigen sie sofort aus: **kein** Grün, **kein** Off-Timer
+und **kein** Ton – die Ampel bleibt rot, weil der Haupt-Agent weiterarbeitet. Nur
+ein echtes `Stop` (Haupt-Agent wirklich fertig) schaltet grün und klingelt. Dafür
+muss der **aktuelle Dispatcher** installiert sein (er exportiert
+`CLAUDE_HOOK_EVENT`/`CLAUDE_AGENT_ID`) – nach Änderungen also den Installer erneut
+laufen lassen.
+
 Gelb wird **bewusst** nur über das Frage-Tool `AskUserQuestion` bzw. eine
 Berechtigungsanfrage ausgelöst – nicht über den allgemeinen `Notification`-Hook,
 weil dieser auch im Leerlauf feuert und die Ampel sonst grundlos gelb färbt.
